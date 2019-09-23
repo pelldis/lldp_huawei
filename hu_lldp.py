@@ -1,19 +1,34 @@
-import pexpect
+#!/usr/bin/python
 
+import pexpect
+import getpass
 
 #Function for connecting to device
 # need ip address in format 1.1.1.1 to connect
 def connect_to_device(ip):
     print "Connecting to device: " + ip
-    login = raw_input('login: ')
-    password = raw_input('password: ')
     #login = 'admin'
     #password = 'Juniper'
     global ssh
-    ssh = pexpect.spawn('ssh ' + login + '@' +ip)
-    ssh.expect('\:')
-    ssh.sendline(password)
-    ssh.expect('>')
+    try:
+        ssh = pexpect.spawn('ssh ' + login + '@' +ip, timeout=4)
+        next_step = ssh.expect(['password\:', 'no\)?'])
+        if next_step == 0:
+            ssh.sendline(password)
+            ssh.expect('>')
+            print 'Connected'
+        elif next_step == 1:
+            print 'Saving new ssh key for connecting device...'
+            ssh.sendline('yes')
+            ssh.expect('password\:')
+            ssh.sendline(password)
+            ssh.expect('>')
+            print 'Connected'
+        return True
+    except:
+        print "\n\nLooks line your ssh key is too old, \nplease \
+clear it in file ../.ssh/known_hosts\n\
+or may be any else error...\n"
     
 #function for get lldp neighbors 
 def get_lldp_nbrs():
@@ -40,7 +55,7 @@ def generate_cfg(lst):
 
 def cfg_write(lst):
     do_it = raw_input("\nWrite the configuration?(y/n):")
-    if do_it == 'y':
+    if do_it in ['y', 'yes']:
         print "Writting the configuration..."
         ssh.sendline('sys')
         ssh.expect(']')
@@ -60,10 +75,13 @@ def cfg_write(lst):
 
 if __name__ == "__main__":
     devices = open('ip.txt').read().split()
+    global login
+    global password
+    login = raw_input('login: ')
+    password = getpass.getpass(prompt='password: ')
     for ip in devices:
-        connect_to_device(ip)
-        cfg_write(generate_cfg(get_lldp_nbrs()))
-
+        if connect_to_device(ip):
+            cfg_write(generate_cfg(get_lldp_nbrs()))
 
 
 
